@@ -1382,7 +1382,6 @@ launch() {
        docker create -v /w -v /w-noop -v /w-nomcast --name=$VOLUMES_CONTAINER_NAME \
            --label=weavevolumes --entrypoint=/bin/false $EXEC_IMAGE >/dev/null
     fi
-    detect_awsvpc
     [ -n "$AWSVPC" ] && PROXY_ARGS="$PROXY_ARGS --no-multicast-route"
 
     # Set WEAVE_DOCKER_ARGS in the environment in order to supply

@@ -64,6 +64,7 @@ func (s *State) doneContactingPeers() {
 
 // serveStatus returns "pass", "running", or "fail".
 func (s *State) serveStatus(w http.ResponseWriter, r *http.Request) {
+	s.Logf("Checking status for %s with %d sent and %d received and %d peers", *service, len(s.Sent), len(s.Received), *peerCount)
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	if len(s.Sent) >= *peerCount && len(s.Received) >= *peerCount {
@@ -133,7 +134,7 @@ func (s *State) appendErr(err error) {
 func (s *State) Logf(format string, args ...interface{}) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.Log = append(s.Log, fmt.Sprintf(format, args...))
+	s.Log = append(s.Log, fmt.Sprintf("%s "+format, append([]interface{}{time.Now()}, args...)...))
 	if len(s.Log) > 500 {
 		s.Log = s.Log[1:]
 	}

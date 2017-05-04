@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -36,6 +37,7 @@ var (
 	peerCount     = flag.Int("peers", 8, "Must find at least this many peers for the test to pass.")
 	service       = flag.String("service", "nettest", "Service to find other network test pods in.")
 	delayShutdown = flag.Int("delay-shutdown", 0, "Number of seconds to delay shutdown when receiving SIGTERM.")
+	waitIface     = flag.String("iface", "", "name of interface to wait for")
 )
 
 // State tracks the internal state of our little http server.
@@ -164,6 +166,13 @@ func main() {
 		log.Fatalf("Error getting hostname: %v", err)
 	}
 
+	if *waitIface != "" {
+		_, err = EnsureInterface(*waitIface, 30)
+		if err != nil {
+			log.Fatalf("Error getting interface: %v", err)
+		}
+	}
+
 	if *delayShutdown > 0 {
 		termCh := make(chan os.Signal)
 		signal.Notify(termCh, syscall.SIGTERM)
@@ -269,4 +278,25 @@ func contactSingle(e string, state *State) {
 		return
 	}
 	state.appendSuccessfulSend(wr.Hostname)
+}
+
+func EnsureInterface(ifaceName string, wait int) (iface *net.Interface, err error) {
+	if iface, err = findInterface(ifaceName); err == nil || wait == 0 {
+		return
+	}
+	for ; err != nil && wait > 0; wait -= 1 {
+		time.Sleep(1 * time.Second)
+		iface, err = findInterface(ifaceName)
+	}
+	return
+}
+
+func findInterface(ifaceName string) (iface *net.Interface, err error) {
+	if iface, err = net.InterfaceByName(ifaceName); err != nil {
+		return iface, fmt.Errorf("Unable to find interface %s", ifaceName)
+	}
+	if 0 == (net.FlagUp & iface.Flags) {
+		return iface, fmt.Errorf("Interface %s is not up", ifaceName)
+	}
+	return
 }

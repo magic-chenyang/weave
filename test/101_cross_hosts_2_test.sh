@@ -39,9 +39,9 @@ start_suite "Network test over cross-host weave network (with and without IPAM)"
 weave_on $HOST1 launch --ipalloc-range $UNIVERSE --ipalloc-default-subnet $SUBNET_1
 weave_on $HOST2 launch --ipalloc-range $UNIVERSE --ipalloc-default-subnet $SUBNET_1 $HOST1
 
-docker_on $HOST1 run --name=c1 -dt -p 8080:8080 $IMAGE -peers=2 $C1 $C2
+docker_on $HOST1 run --name=c1 -dt -p 8080:8080 $IMAGE -peers=2 --iface=ethwe $C1 $C2
 weave_on  $HOST1 attach    $C1/24 c1
-docker_on $HOST2 run --name=c2 -dt -p 8080:8080 $IMAGE -peers=2 $C1 $C2
+docker_on $HOST2 run --name=c2 -dt -p 8080:8080 $IMAGE -peers=2 --iface=ethwe $C1 $C2
 weave_on  $HOST2 attach ip:$C2/24 c2
 
 wait_for_network_tester_status

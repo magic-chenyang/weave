@@ -207,7 +207,7 @@ func main() {
 
 // Find all siblings and post to their /write handler.
 func contactOthers(state *State) {
-	sleepTime := 5 * time.Second
+	sleepTime := 1 * time.Second
 	// In large cluster getting all endpoints is pretty expensive.
 	// Thus, we will limit ourselves to send on average at most 10 such
 	// requests per second

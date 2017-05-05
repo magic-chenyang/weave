@@ -116,7 +116,7 @@ func (s *State) serveWrite(w http.ResponseWriter, r *http.Request) {
 		if s.Received == nil {
 			s.Received = map[string]int{}
 		}
-		s.Received[wp.Source] += 1
+		s.Received[wp.Source]++
 	}
 	s.appendErr(json.NewEncoder(w).Encode(&WriteResp{Hostname: s.Hostname}))
 }
@@ -147,7 +147,7 @@ func (s *State) appendSuccessfulSend(toHostname string) {
 	if s.Sent == nil {
 		s.Sent = map[string]int{}
 	}
-	s.Sent[toHostname] += 1
+	s.Sent[toHostname]++
 }
 
 var (
@@ -285,7 +285,7 @@ func EnsureInterface(ifaceName string, wait int) (iface *net.Interface, err erro
 	if iface, err = findInterface(ifaceName); err == nil || wait == 0 {
 		return
 	}
-	for ; err != nil && wait > 0; wait -= 1 {
+	for ; err != nil && wait > 0; wait-- {
 		time.Sleep(1 * time.Second)
 		iface, err = findInterface(ifaceName)
 	}

@@ -50,6 +50,7 @@ func dockerAPIEndpoint(endpoint string) *regexp.Regexp {
 }
 
 type Config struct {
+	Disabled            bool
 	HostnameFromLabel   string
 	HostnameMatch       string
 	HostnameReplacement string
@@ -701,11 +702,12 @@ func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
 	return
 }
 
-func (proxy *Proxy) Stop() {
+func (proxy *Proxy) Stop() error {
 	close(proxy.quit)
 	proxy.Lock()
 	defer proxy.Unlock()
 	for _, j := range proxy.attachJobs {
 		j.Stop()
 	}
+	return nil
 }

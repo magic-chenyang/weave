@@ -1275,6 +1275,7 @@ launch() {
     [ -n "$DOCKER_BRIDGE_IP" ] || DOCKER_BRIDGE_IP=$(util_op bridge-ip $DOCKER_BRIDGE)
     DNS_ROUTER_OPTS="--dns-listen-address $DOCKER_BRIDGE_IP:53"
     NO_DNS_OPT=
+    NO_PROXY=
 
     while [ $# -gt 0 ] ; do
         case "$1" in
@@ -1320,6 +1321,10 @@ launch() {
             --plugin)
                 PLUGIN_ARGS="--plugin"
                 ENABLE_PLUGIN=1
+                ;;
+            --no-proxy)
+                NO_PROXY=1
+                ARGS="$ARGS --no-proxy"
                 ;;
             *)
                 ARGS="$ARGS '$(echo "$1" | sed "s|'|'\"'\"'|g")'"
@@ -1423,7 +1428,7 @@ launch() {
         $PROXY_ARGS)
     wait_for_status $CONTAINER_NAME http_call $HTTP_ADDR
     # Wait for Weave Proxy:
-    wait_for_status $CONTAINER_NAME http_call_unix $CONTAINER_NAME status.sock
+    [ -n "$NO_PROXY" ] || wait_for_status $CONTAINER_NAME http_call_unix $CONTAINER_NAME status.sock
 }
 
 stop() {

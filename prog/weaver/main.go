@@ -452,18 +452,21 @@ func main() {
 		go expose(allocator, defaultSubnet, bridgeConfig.WeaveBridgeName, bridgeConfig.AWSVPC)
 	}
 
-	// Start Weave Proxy:
-	proxy, err := weaveproxy.NewProxy(*proxyConfig)
-	if err != nil {
-		Log.Fatalf("Could not start proxy: %s", err)
+	if proxyConfig.Disabled {
+		signals.SignalHandlerLoop(common.Log, router)
+	} else {
+		// Start Weave Proxy:
+		proxy, err := weaveproxy.NewProxy(*proxyConfig)
+		if err != nil {
+			Log.Fatalf("Could not start proxy: %s", err)
+		}
+		defer proxy.Stop()
+		listeners := proxy.Listen()
+		proxy.AttachExistingContainers()
+		go proxy.Serve(listeners)
+		go proxy.ListenAndServeStatus("/home/weave/status.sock")
+		signals.SignalHandlerLoop(common.Log, proxy, router)
 	}
-	defer proxy.Stop()
-	listeners := proxy.Listen()
-	proxy.AttachExistingContainers()
-	go proxy.Serve(listeners)
-	go proxy.ListenAndServeStatus("/home/weave/status.sock")
-
-	signals.SignalHandlerLoop(common.Log, router)
 }
 
 func expose(alloc *ipam.Allocator, subnet address.CIDR, bridgeName string, removeDefaultRoute bool) {
@@ -522,6 +525,7 @@ func configureProxy(version string, defaultDockerHost string) *weaveproxy.Config
 		DockerBridge: getenvOrDefault("DOCKER_BRIDGE", "docker0"),
 		DockerHost:   defaultDockerHost,
 	}
+	mflag.BoolVar(&proxyConfig.Disabled, []string{"-no-proxy"}, false, "instruct Weave not to start the Docker proxy")
 	mflagext.ListVar(&proxyConfig.ListenAddrs, []string{"H"}, nil, "addresses on which to listen")
 	mflag.StringVar(&proxyConfig.HostnameFromLabel, []string{"-hostname-from-label"}, "", "Key of container label from which to obtain the container's hostname")
 	mflag.StringVar(&proxyConfig.HostnameMatch, []string{"-hostname-match"}, "(.*)", "Regexp pattern to apply on container names (e.g. '^aws-[0-9]+-(.*)$')")

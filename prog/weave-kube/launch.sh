@@ -116,7 +116,7 @@ post_start_actions &
 
 /home/weave/weaver $EXTRA_ARGS --port=6783 $(router_bridge_opts) \
      --host-root=$HOST_ROOT \
-     --http-addr=$HTTP_ADDR --status-addr=$STATUS_ADDR --docker-api='' --no-dns \
+     --http-addr=$HTTP_ADDR --status-addr=$STATUS_ADDR --docker-api='' --no-dns --no-proxy \
      --ipalloc-range=$IPALLOC_RANGE $NICKNAME_ARG \
      --ipalloc-init $IPALLOC_INIT \
      --conn-limit=$CONN_LIMIT \

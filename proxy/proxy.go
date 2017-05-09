@@ -19,7 +19,6 @@ import (
 	weaveapi "github.com/weaveworks/weave/api"
 	weavedocker "github.com/weaveworks/weave/common/docker"
 	weavenet "github.com/weaveworks/weave/net"
-	"github.com/weaveworks/weave/net/address"
 )
 
 const (
@@ -497,53 +496,67 @@ func (proxy *Proxy) attach(containerID string) error {
 		return nil
 	}
 	Log.Infof("Attaching container %s with WEAVE_CIDR \"%s\" to weave network", container.ID, strings.Join(cidrs, " "))
-	if err := validateCIDRs(cidrs); err != nil {
+	ips, err := proxy.allocateCIDRs(container.ID, cidrs)
+	if err != nil {
 		return err
 	}
 
 	args := []string{"attach"}
 	args = append(args, cidrs...)
 	if !proxy.NoRewriteHosts {
-		args = append(args, "--rewrite-hosts")
-
+		var extraHosts []string
 		if container.HostConfig != nil {
-			for _, eh := range container.HostConfig.ExtraHosts {
-				args = append(args, fmt.Sprintf("--add-host=%s", eh))
-			}
+			extraHosts = container.HostConfig.ExtraHosts
 		}
+		fqdn := container.Config.Hostname + "." + container.Config.Domainname
+		proxy.RewriteEtcHosts(container.HostsPath, fqdn, ips, extraHosts)
 	}
 	if proxy.NoMulticastRoute {
 		args = append(args, "--no-multicast-route")
 	}
 	args = append(args, container.ID)
-	return callWeaveAttach(container, args)
+
+	pid := container.State.Pid
+	// TODO: Check that the mtu is taken from the bridge
+	// TODO: plumb through awsvpc setting for keepTXon
+	err = weavenet.AttachContainer(weavenet.NSPathByPid(pid), fmt.Sprint(pid), weavenet.VethName, weavenet.WeaveBridgeName, 0, !proxy.NoMulticastRoute, ips, false /*keepTXOn*/)
+
+	/* What we still have to do:
+	   [ -n "$WITHOUT_DNS" ] || when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
+	*/
+
+	return err
 }
 
-func callWeaveAttach(container *docker.Container, args []string) error {
-	if _, stderr, err := callWeave(args...); err != nil {
-		Log.Warningf("Attaching container %s to weave network failed: %s", container.ID, string(stderr))
-		return errors.New(string(stderr))
-	} else if len(stderr) > 0 {
-		Log.Warningf("Attaching container %s to weave network: %s", container.ID, string(stderr))
+func (proxy *Proxy) allocateCIDRs(containerID string, cidrs []string) ([]*net.IPNet, error) {
+	if len(cidrs) == 0 {
+		cidrs = []string{"net:default"}
 	}
-	return nil
-}
-
-func validateCIDRs(cidrs []string) error {
+	var ipnet *net.IPNet
+	var err error
+	var ipnets []*net.IPNet
 	for _, cidr := range cidrs {
-		if cidr == "net:default" {
-			continue
-		}
-		for _, prefix := range []string{"ip:", "net:", ""} {
-			if strings.HasPrefix(cidr, prefix) {
-				if _, err := address.ParseCIDR(strings.TrimPrefix(cidr, prefix)); err == nil {
-					break
-				}
-				return fmt.Errorf("invalid WEAVE_CIDR: %s", cidr)
+		switch {
+		case cidr == "net:default":
+			ipnet, err = proxy.weave.AllocateIP(containerID)
+		case strings.HasPrefix(cidr, "ip:"):
+			_, ipnet, err = net.ParseCIDR(strings.TrimPrefix(cidr, "ip:"))
+			if err != nil {
+				return nil, fmt.Errorf("invalid WEAVE_CIDR: %s", cidr)
 			}
+		case strings.HasPrefix(cidr, "net:"):
+			_, subnet, err := net.ParseCIDR(strings.TrimPrefix(cidr, "net:"))
+			if err != nil {
+				return nil, fmt.Errorf("invalid WEAVE_CIDR: %s", cidr)
+			}
+			ipnet, err = proxy.weave.AllocateIPInSubnet(containerID, subnet)
 		}
+		if err != nil {
+			return nil, err
+		}
+		ipnets = append(ipnets, ipnet)
 	}
-	return nil
+	return ipnets, nil
 }
 
 func (proxy *Proxy) weaveCIDRs(networkMode string, env []string) ([]string, error) {
@@ -631,7 +644,6 @@ func (proxy *Proxy) updateContainerNetworkSettings(container jsonObject) error {
 }
 
 func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
-	var container *docker.Container
 	binds := []string{"/var/run/weave:/var/run/weave"}
 	froms := []string{}
 	for _, addr := range unixAddrs {
@@ -647,7 +659,10 @@ func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
 	if len(froms) == 0 {
 		return
 	}
+	return proxy.runTransientContainer([]string{"/home/weave/symlink", weaveSock}, froms, binds)
+}
 
+func (proxy *Proxy) runTransientContainer(entrypoint, cmd, binds []string) (err error) {
 	env := []string{
 		"PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 	}
@@ -656,14 +671,18 @@ func (proxy *Proxy) symlink(unixAddrs []string) (err error) {
 		env = append(env, fmt.Sprintf("%s=%s", "WEAVE_DEBUG", val))
 	}
 
+	var container *docker.Container
 	container, err = proxy.client.CreateContainer(docker.CreateContainerOptions{
 		Config: &docker.Config{
 			Image:      proxy.Image,
-			Entrypoint: []string{"/home/weave/symlink", weaveSock},
-			Cmd:        froms,
+			Entrypoint: entrypoint,
+			Cmd:        cmd,
 			Env:        env,
 		},
-		HostConfig: &docker.HostConfig{Binds: binds},
+		HostConfig: &docker.HostConfig{
+			Binds:       binds,
+			NetworkMode: "none",
+		},
 	})
 	if err != nil {
 		return

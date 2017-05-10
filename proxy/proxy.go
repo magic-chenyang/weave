@@ -3,7 +3,6 @@ package proxy
 import (
 	"bytes"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -16,6 +15,8 @@ import (
 	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
+	"github.com/pkg/errors"
+
 	weaveapi "github.com/weaveworks/weave/api"
 	weavedocker "github.com/weaveworks/weave/common/docker"
 	weavenet "github.com/weaveworks/weave/net"
@@ -511,12 +512,12 @@ func (proxy *Proxy) attach(containerID string) error {
 
 	args := []string{"attach"}
 	args = append(args, cidrs...)
+	fqdn := container.Config.Hostname + "." + container.Config.Domainname
 	if !proxy.NoRewriteHosts {
 		var extraHosts []string
 		if container.HostConfig != nil {
 			extraHosts = container.HostConfig.ExtraHosts
 		}
-		fqdn := container.Config.Hostname + "." + container.Config.Domainname
 		proxy.RewriteEtcHosts(container.HostsPath, fqdn, ips, extraHosts)
 	}
 	if proxy.NoMulticastRoute {
@@ -528,10 +529,17 @@ func (proxy *Proxy) attach(containerID string) error {
 	// TODO: Check that the mtu is taken from the bridge
 	// TODO: plumb through awsvpc setting for keepTXon
 	err = weavenet.AttachContainer(weavenet.NSPathByPid(pid), fmt.Sprint(pid), weavenet.VethName, weavenet.WeaveBridgeName, 0, !proxy.NoMulticastRoute, ips, false /*keepTXOn*/)
+	if err != nil {
+		return err
+	}
 
-	/* What we still have to do:
-	   [ -n "$WITHOUT_DNS" ] || when_weave_running with_container_fqdn $CONTAINER put_dns_fqdn $ALL_CIDRS
-	*/
+	if !proxy.WithoutDNS {
+		for _, ip := range ips {
+			if err := proxy.weave.RegisterWithDNS(container.ID, fqdn, ip.IP.String()); err != nil {
+				return errors.Wrapf(err, "unable to register %s with weaveDNS: %s", container.ID, err)
+			}
+		}
+	}
 
 	return err
 }

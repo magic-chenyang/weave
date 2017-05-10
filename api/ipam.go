@@ -24,7 +24,7 @@ func (client *Client) ipamOp(ID string, op string, values url.Values) (*net.IPNe
 }
 
 func ipamValues(checkAlive bool) url.Values {
-	var values url.Values
+	values := make(url.Values)
 	if checkAlive {
 		values.Set("check-alive", "true")
 	}

@@ -562,9 +562,9 @@ func (proxy *Proxy) allocateCIDRs(containerID string, cidrs []string) ([]*net.IP
 			}
 			ipnet, err = proxy.weave.AllocateIPInSubnet(containerID, subnet)
 		case strings.HasPrefix(cidr, "ip:"):
-			ipnet, err = parseCIDR(strings.TrimPrefix(cidr, "ip:"))
+			ipnet, err = proxy.claimCIDR(containerID, strings.TrimPrefix(cidr, "ip:"))
 		default:
-			ipnet, err = parseCIDR(cidr)
+			ipnet, err = proxy.claimCIDR(containerID, cidr)
 		}
 		if err != nil {
 			return nil, errors.Wrapf(err, "for %q", cidr)
@@ -574,13 +574,14 @@ func (proxy *Proxy) allocateCIDRs(containerID string, cidrs []string) ([]*net.IP
 	return ipnets, nil
 }
 
-func parseCIDR(cidr string) (*net.IPNet, error) {
+func (proxy *Proxy) claimCIDR(containerID, cidr string) (*net.IPNet, error) {
 	ip, ipnet, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return nil, err
 	}
 	ipnet.IP = ip // we want the specific IP plus the mask
-	return ipnet, nil
+	err = proxy.weave.ClaimIP(containerID, ipnet)
+	return ipnet, err
 }
 
 func (proxy *Proxy) weaveCIDRs(networkMode string, env []string) ([]string, error) {

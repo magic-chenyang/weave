@@ -550,7 +550,8 @@ func (proxy *Proxy) allocateCIDRs(containerID string, cidrs []string) ([]*net.IP
 		case cidr == "net:default":
 			ipnet, err = proxy.weave.AllocateIP(containerID)
 		case strings.HasPrefix(cidr, "net:"):
-			_, subnet, err := net.ParseCIDR(strings.TrimPrefix(cidr, "net:"))
+			var subnet *net.IPNet
+			_, subnet, err = net.ParseCIDR(strings.TrimPrefix(cidr, "net:"))
 			if err != nil {
 				break
 			}

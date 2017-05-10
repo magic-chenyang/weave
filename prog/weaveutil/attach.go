@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"syscall"
 
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/vishvananda/netns"
 
 	weavenet "github.com/weaveworks/weave/net"
+	"github.com/weaveworks/weave/proxy"
 )
 
 func attach(args []string) error {
@@ -109,4 +111,27 @@ func detach(args []string) error {
 		return err
 	}
 	return weavenet.DetachContainer(weavenet.NSPathByPid(pid), args[0], weavenet.VethName, cidrs)
+}
+
+func rewriteEtcHosts(args []string) error {
+	if len(args) < 4 {
+		cmdUsage("rewrite-etc-hosts", "<hosts-path> <fqdn> <image> <cidr>... [name:addr...]")
+	}
+	hostsPath := args[0]
+	fqdn := args[1]
+	image := args[2]
+	var ips []*net.IPNet
+	for _, cidr := range strings.Fields(args[3]) {
+		_, ipnet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return err
+		}
+		ips = append(ips, ipnet)
+	}
+	extraHosts := args[4:]
+	p, err := proxy.StubProxy(proxy.Config{Image: image})
+	if err != nil {
+		return err
+	}
+	return p.RewriteEtcHosts(hostsPath, fqdn, ips, extraHosts)
 }

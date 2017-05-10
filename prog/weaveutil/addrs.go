@@ -2,13 +2,10 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/fsouza/go-dockerclient"
 
-	weaveapi "github.com/weaveworks/weave/api"
 	weavenet "github.com/weaveworks/weave/net"
-	"github.com/weaveworks/weave/proxy"
 )
 
 func containerAddrs(args []string) error {
@@ -107,23 +104,4 @@ func bridgeIP(args []string) error {
 	}
 	fmt.Printf("%v", ip)
 	return nil
-}
-
-func rewriteEtcHosts(args []string) error {
-	if len(args) < 3 {
-		cmdUsage("rewrite-etc-hosts", "<hosts-path> <fqdn> <cidr>... [name:addr...]")
-	}
-	hostsPath := args[0]
-	fqdn := args[1]
-	var ips []*net.IPNet
-	for _, cidr := range strings.Fields(args[2]) {
-		_, ipnet, err := net.ParseCIDR(cidr)
-		if err != nil {
-			return err
-		}
-		ips = append(ips, ipnet)
-	}
-	extraHosts := args[3:]
-	p := proxy.Proxy{client: weaveapi.NewClient(os.Getenv("WEAVE_HTTP_ADDR"), nil)}
-	err := p.RewriteEtcHosts(hostsPath, fqdn, ips, extraHosts)
 }

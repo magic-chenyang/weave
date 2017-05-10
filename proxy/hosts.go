@@ -24,20 +24,25 @@ func (proxy *Proxy) RewriteEtcHosts(hostsPath, fqdn string, ips []*net.IPNet, ex
 	return nil
 }
 
+// we assume (for compatibility with the weave script) that fqdn has a dot
+// between hostname and domain. domain may be blank.
 func writeEtcHostsContents(w io.Writer, fqdn string, cidrs []*net.IPNet, extraHosts []string) {
-	var name, hostnames string
-	if index := strings.Index(fqdn, "."); index == -1 {
-		name = fqdn
+	index := strings.Index(fqdn, ".")
+	name := fqdn[:index]
+	var hostnames string
+	if index == len(fqdn)-1 { // dot comes at the end - no domain
 		hostnames = name
 	} else {
-		name = fqdn[:index]
-		hostnames = fqdn + ". " + name
+		if fqdn[len(fqdn)-1] == '.' { // strip a final trailing dot
+			fqdn = fqdn[:len(fqdn)-1]
+		}
+		hostnames = fqdn + " " + name
 	}
 
 	fmt.Fprintln(w, "# created by Weave - BEGIN")
 	fmt.Fprintln(w, "# container hostname")
 	for _, cidr := range cidrs {
-		fmt.Fprintf(w, "%s    %s\n", cidr.IP, hostnames)
+		fmt.Fprintf(w, "%-15s %s\n", cidr.IP, hostnames)
 	}
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "# static names added with --add-host")
@@ -46,7 +51,7 @@ func writeEtcHostsContents(w io.Writer, fqdn string, cidrs []*net.IPNet, extraHo
 		if len(parts) != 2 {
 			continue
 		}
-		fmt.Fprintf(w, "%s    %s\n", parts[0], parts[1])
+		fmt.Fprintf(w, "%-15s %s\n", parts[1], parts[0])
 	}
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "# default localhost entries")

@@ -857,7 +857,7 @@ rewrite_etc_hosts() {
     FQDN=${HOSTS_PATH_AND_FQDN#* }
     # rewrite /etc/hosts, unlinking the file (so Docker does not modify it again) but
     # leaving it with valid contents...
-    util_op rewrite-etc-hosts "$HOSTS" "$FQDN" "$ALL_CIDRS" "$@"
+    util_op rewrite-etc-hosts "$HOSTS" "$FQDN" "$EXEC_IMAGE" "$ALL_CIDRS" "$@"
 }
 
 # Print an error to stderr and return with an indicative exit status

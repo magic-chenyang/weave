@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"syscall"
@@ -129,7 +130,11 @@ func rewriteEtcHosts(args []string) error {
 		ips = append(ips, ipnet)
 	}
 	extraHosts := args[4:]
-	p, err := proxy.StubProxy(proxy.Config{Image: image})
+	docker := os.Getenv("DOCKER_HOST")
+	if docker == "" {
+		docker = "unix:///var/run/docker.sock"
+	}
+	p, err := proxy.StubProxy(proxy.Config{DockerHost: docker, Image: image})
 	if err != nil {
 		return err
 	}

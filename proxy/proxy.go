@@ -75,7 +75,7 @@ type wait struct {
 type Proxy struct {
 	sync.Mutex
 	Config
-	client                 *docker.Client
+	client                 *weavedocker.Client
 	weave                  *weaveapi.Client
 	dockerBridgeIP         string
 	hostnameMatchRegexp    *regexp.Regexp
@@ -168,7 +168,7 @@ func NewProxy(c Config) (*Proxy, error) {
 		return nil, err
 	}
 
-	client.AddObserver(p)
+	p.client.AddObserver(p)
 
 	return p, nil
 }

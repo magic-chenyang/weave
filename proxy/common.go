@@ -11,6 +11,7 @@ import (
 
 	"github.com/fsouza/go-dockerclient"
 	"github.com/weaveworks/weave/common"
+	weavedocker "github.com/weaveworks/weave/common/docker"
 )
 
 var (
@@ -78,7 +79,7 @@ func marshalResponseBody(r *http.Response, body interface{}) error {
 	return nil
 }
 
-func inspectContainerInPath(client *docker.Client, path string) (*docker.Container, error) {
+func inspectContainerInPath(client *weavedocker.Client, path string) (*docker.Container, error) {
 	subs := containerIDRegexp.FindStringSubmatch(path)
 	if subs == nil {
 		err := fmt.Errorf("No container id found in request with path %s", path)

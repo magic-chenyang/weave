@@ -510,8 +510,6 @@ func (proxy *Proxy) attach(containerID string) error {
 		return err
 	}
 
-	args := []string{"attach"}
-	args = append(args, cidrs...)
 	fqdn := container.Config.Hostname + "." + container.Config.Domainname
 	if !proxy.NoRewriteHosts {
 		var extraHosts []string
@@ -520,10 +518,6 @@ func (proxy *Proxy) attach(containerID string) error {
 		}
 		proxy.RewriteEtcHosts(container.HostsPath, fqdn, ips, extraHosts)
 	}
-	if proxy.NoMulticastRoute {
-		args = append(args, "--no-multicast-route")
-	}
-	args = append(args, container.ID)
 
 	pid := container.State.Pid
 	// TODO: Check that the mtu is taken from the bridge
